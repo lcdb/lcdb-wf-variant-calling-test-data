@@ -16,21 +16,43 @@ reference = 'data/GRCh38.6.20.fa.gz'
 mapped_n = 2000000
 unmapped_n = 1000
 
+known = 'data/known_variation.vcf.gz'
+
 #Final results of the test data should be a subset exon bedfile, a subset fasta reference, and subset reads
 rule all:
     input:
         expand('data/{sample}_R{n}.6.20.fq.gz', n=[1,2], sample=WGS_accessions.keys()),
         'data/exons_subset.bed',
         reference,
+        known
 
+
+rule known_variation:
+    """
+    Download the known variation file. Remove iupac codes and subset.
+    """
+    resources:
+        mem_mb=1024 * 16,
+        disk_mb=1024 * 16,
+        runtime=60
+    output: 'data/known_variation.vcf.gz'
+    shell: 
+        'curl -O ftp://ftp.ensembl.org/pub/release-102/variation/vcf/homo_sapiens/homo_sapiens-chr6.vcf.gz -O ftp://ftp.ensembl.org/pub/release-102/variation/vcf/homo_sapiens/homo_sapiens-chr6.vcf.gz.csi -O ftp://ftp.ensembl.org/pub/release-102/variation/vcf/homo_sapiens/homo_sapiens-chr20.vcf.gz -O ftp://ftp.ensembl.org/pub/release-102/variation/vcf/homo_sapiens/homo_sapiens-chr20.vcf.gz.csi && bcftools concat -Oz --naive homo_sapiens-chr6.vcf.gz homo_sapiens-chr20.vcf.gz > concat.vcf.gz && bcftools reheader --fai /gpfs/gsfs10/users/NICHD-core0/test/fridellsa/variant-calling/references/GRCh38.6.20.fa.gz.fai concat.vcf.gz > tmp_known_variation.vcf.gz && '
+        'rbt vcf-fix-iupac-alleles < tmp_known_variation.vcf.gz | bcftools view -Oz > tmp_no_iupac.vcf.gz && '
+        'zgrep ^# tmp_no_iupac.vcf.gz > {output} && '
+        'tabix -p vcf tmp_no_iupac.vcf.gz && '
+        'tabix -R data/LIMIT.bed tmp_no_iupac.vcf.gz >> {output} && '
+        'bcftools view {output} -Oz > {output} && '
+        ' rm homo_sapiens-chr* concat.vcf.gz* tmp_known_variation.vcf.gz* tmp_no_iupac.vcf.gz* '
 
 rule exons:
     """
     Get the exons for chromosomes 6 and 20. The paper that published the reference dataset indicates a high coverage in chromosome 6 for Illumina HiSeq 4000 reads
     """
     resources:
-        mem_mb= 1024 * 2
-        disk_mb= 1024 * 2
+        mem_mb= 1024 * 2,
+        disk_mb= 1024 * 2,
+        runtime=30
     output: 'data/full_exons.bed'
     shell:
         'wget https://ftp.ensembl.org/pub/release-108/gff3/homo_sapiens/Homo_sapiens.GRCh38.108.chromosome.6.gff3.gz -O- > gff ; '
@@ -47,8 +69,9 @@ rule LIMIT:
     Get a limited bed file to subset the exon bed and select reads
     """
     resources:
-        mem_mb= 1024 * 2
-        disk_mb= 1024 * 2
+        mem_mb= 1024 * 2,
+        disk_mb= 1024 * 2,
+        runtime=20
     output: 'data/LIMIT.bed'
     shell:
         'echo "6	42900000	42970000	chr6" > {output}; '
@@ -60,8 +83,9 @@ rule fasta:
     Get the fasta file for chromosome 6 and 20
     """
     resources:
-        mem_mb= 1024 * 4
-        disk_mb= 1024 * 4
+        mem_mb= 1024 * 4,
+        disk_mb= 1024 * 4,
+        runtime=60
     output: 'data/GRCh38.6.20.fa.gz',
     shell:
         'curl -L  ftp://ftp.ensembl.org/pub/release-108/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.6.fa.gz > temp ' 
@@ -74,8 +98,9 @@ rule WGS_download_normal:
     Get the WGS samples using the RRA accession code for R1
     """
     resources:
-        mem_mb= 1024 * 64
-        disk_mb= 1024 * 2000
+        mem_mb= 1024 * 64,
+        disk_mb= 1024 * 2000,
+        runtime=24*60
     output:
         normal_R1='data/normal_R1_full.fq.gz',
         normal_R2='data/normal_R2_full.fq.gz',
@@ -92,8 +117,9 @@ rule WGS_download_tumor:
     Get the WGS samples using the RRA accession code for R2
     """
     resources:
-        mem_mb= 1024 * 64
-        disk_mb= 1024 * 2000
+        mem_mb= 1024 * 64,
+        disk_mb= 1024 * 2000,
+        runtime=24*60
     output:
         tumor_R2='data/tumor_R2_full.fq.gz',
         tumor_R1='data/tumor_R1_full.fq.gz'
@@ -109,8 +135,9 @@ rule bwa_index:
     Get the index for BWA
     """
     resources:
-        mem_mb= 1024 * 16
-        disk_mb= 1024 * 16
+        mem_mb= 1024 * 16,
+        disk_mb= 1024 * 16,
+        runtime=4*60
     input:
         reference,
     output:
@@ -124,8 +151,9 @@ rule align_reads:
     Align the reads to the reference, since the reference is only Chr6, and Chr20 we will only have Chr6/20 reads
     """
     resources:
-        mem_mb= 1024 * 32
-        disk_mb= 1024 * 24
+        mem_mb= 1024 * 32,
+        disk_mb= 1024 * 24,
+        runtime=54*60
     input:
         reads=['data/{sample}_R1_full.fq.gz', 'data/{sample}_R2_full.fq.gz'],
         idx=rules.bwa_index.output,
@@ -146,8 +174,9 @@ rule small_fastq:
     Use Seqtk to subset the fastq using the read tags
     """
     resources:
-        disk_mb= 1024 * 100
-        mem_mb= 1024 * 32
+        disk_mb= 1024 * 100,
+        mem_mb= 1024 * 32,
+        runtime=24*60
     input:
         bam=rules.align_reads.output,
         limits=rules.LIMIT.output,
@@ -214,8 +243,9 @@ rule small_bed:
     The small bed file will correspond to the reads that are in the small fastqs via subsetting with the LIMITs bed file
     """
     resources:
-        mem_mb= 1024 * 2
-        disk_mb= 1024 * 2
+        mem_mb= 1024 * 2,
+        disk_mb= 1024 * 2,
+        runtime=4*60
     input:
         limit=rules.LIMIT.output,
         bed=rules.exons.output
