@@ -85,7 +85,7 @@ rule dbnsfp:
                 '''zgrep ^# tmp.vcf.gz > full.tmp.vcf && '''
                 '''tabix -R {workdir}/{input.bed} tmp.vcf.gz >> full.tmp.vcf && '''
                 '''bgzip -c full.tmp.vcf > {workdir}/{output.vcf}) && '''
-                '''tabix -s 1 -b 2 -e 2 -p vcf {output.vcf} '''
+                '''tabix -s 1 -b 2 -e 2 {output.vcf} '''
             )
 
 
