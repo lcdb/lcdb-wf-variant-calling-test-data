@@ -23,9 +23,9 @@ dbnsfp = 'data/dbnsfp_6_20.vcf.gz'
 #Final results of the test data should be a subset exon bedfile, a subset fasta reference, and subset reads
 rule all:
     input:
-        #expand('data/{sample}_R{n}.6.20.fq.gz', n=[1,2], sample=WGS_accessions.keys()),
-        #'data/exons_subset.bed',
-        # known,
+        expand('data/{sample}_R{n}.6.20.fq.gz', n=[1,2], sample=WGS_accessions.keys()),
+        'data/exons_subset.bed',
+        known,
         dbnsfp
 
 
