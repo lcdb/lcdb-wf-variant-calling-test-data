@@ -1,11 +1,12 @@
-bcftools <=1.13
+bcftools <= 1.13
 bedtools
 sra-tools
 bwa
 seqtk
 curl
 git
-python >=3
+python >=3.10
 rust-bio-tools
 samtools
 snakemake
+
